@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>컬러 팔레트</title>
+  <style>
+    .palette-canvas {
+      display: block;
+      cursor: crosshair;
+      border-radius: 8px;
+    }
+
+    .result-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .preview-box {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      flex-shrink: 0;
+    }
+
+    .color-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .color-code {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .color-rgb {
+      font-size: 14px;
+      color: #555;
+    }
+
+    .control-wrap {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .rgb-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rgb-input-wrap label {
+      font-weight: bold;
+      width: 20px;
+    }
+
+    .rgb-input-wrap input[type="number"] {
+      width: 60px;
+      padding: 4px 6px;
+      font-size: 14px;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+    }
+
+    .rgb-input-wrap input[type="range"] {
+      width: 200px;
+      accent-color: #1a73e8;
+    }
+
+    .rgb-input-wrap .rgb-value {
+      font-size: 14px;
+      width: 30px;
+    }
+
+    .brightness-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brightness-wrap label {
+      font-weight: bold;
+      width: 40px;
+    }
+
+    .brightness-wrap input[type="range"] {
+      width: 300px;
+      accent-color: #555;
+    }
+
+    .brightness-wrap .brightness-value {
+      font-size: 14px;
+      width: 40px;
+    }
+
+    .btn-apply {
+      padding: 8px 20px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-apply:hover {
+      background-color: #1558b0;
+    }
+  </style>
+</head>
+<body>
+  <h2>컬러 팔레트</h2>
+
+  <canvas class="palette-canvas" id="paletteCanvas" width="800" height="300"></canvas>
+
+  <div class="result-wrap">
+    <div class="preview-box" id="preview"></div>
+    <div class="color-info">
+      <span class="color-code" id="colorCode">색을 선택하세요</span>
+      <span class="color-rgb" id="colorRgb"></span>
+    </div>
+  </div>
+
+  <div class="control-wrap">
+
+    <!-- RGB 직접 입력 -->
+    <div class="rgb-input-wrap">
+      <label style="color:red">R</label>
+      <input type="range" id="rangeR" min="0" max="255" value="255">
+      <input type="number" id="inputR" min="0" max="255" value="255">
+    </div>
+    <div class="rgb-input-wrap">
+      <label style="color:green">G</label>
+      <input type="range" id="rangeG" min="0" max="255" value="0">
+      <input type="number" id="inputG" min="0" max="255" value="0">
+    </div>
+    <div class="rgb-input-wrap">
+      <label style="color:blue">B</label>
+      <input type="range" id="rangeB" min="0" max="255" value="0">
+      <input type="number" id="inputB" min="0" max="255" value="0">
+    </div>
+
+    <!-- 명암 조절 -->
+    <div class="brightness-wrap">
+      <label>명암</label>
+      <input type="range" id="rangeBrightness" min="-255" max="255" value="0">
+      <span class="brightness-value" id="brightnessValue">0</span>
+    </div>
+
+    <div>
+      <button class="btn-apply" id="btnApply">적용</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('paletteCanvas');
+    const ctx = canvas.getContext('2d');
+    const preview = document.getElementById('preview');
+    const colorCode = document.getElementById('colorCode');
+    const colorRgb = document.getElementById('colorRgb');
+
+    const rangeR = document.getElementById('rangeR');
+    const rangeG = document.getElementById('rangeG');
+    const rangeB = document.getElementById('rangeB');
+    const inputR = document.getElementById('inputR');
+    const inputG = document.getElementById('inputG');
+    const inputB = document.getElementById('inputB');
+    const rangeBrightness = document.getElementById('rangeBrightness');
+    const brightnessValue = document.getElementById('brightnessValue');
+
+    let baseR = 255, baseG = 0, baseB = 0;
+
+    function drawPalette() {
+      const width = canvas.width;
+      const height = canvas.height;
+      for (let y = 0; y < height; y++) {
+        const lightness = 10 + (y / height) * 80;
+        for (let x = 0; x < width; x++) {
+          const hue = (x / width) * 360;
+          ctx.fillStyle = `hsl(${hue}, 100%, ${lightness}%)`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+
+    function clamp(v) {
+      return Math.max(0, Math.min(255, Math.round(v)));
+    }
+
+    function toHex(v) {
+      return v.toString(16).padStart(2, '0').toUpperCase();
+    }
+
+    function applyBrightness(r, g, b, bright) {
+      return {
+        r: clamp(r + bright),
+        g: clamp(g + bright),
+        b: clamp(b + bright)
+      };
+    }
+
+    function updatePreview() {
+      const bright = parseInt(rangeBrightness.value);
+      const result = applyBrightness(baseR, baseG, baseB, bright);
+      const hex = '#' + toHex(result.r) + toHex(result.g) + toHex(result.b);
+      preview.style.backgroundColor = hex;
+      colorCode.textContent = hex;
+      colorRgb.textContent = `RGB(${result.r}, ${result.g}, ${result.b})`;
+    }
+
+    function setBase(r, g, b) {
+      baseR = clamp(r);
+      baseG = clamp(g);
+      baseB = clamp(b);
+
+      rangeR.value = baseR; inputR.value = baseR;
+      rangeG.value = baseG; inputG.value = baseG;
+      rangeB.value = baseB; inputB.value = baseB;
+
+      updatePreview();
+    }
+
+    canvas.addEventListener('click', function(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor(e.clientX - rect.left);
+      const y = Math.floor(e.clientY - rect.top);
+      const pixel = ctx.getImageData(x, y, 1, 1).data;
+      rangeBrightness.value = 0;
+      brightnessValue.textContent = 0;
+      setBase(pixel[0], pixel[1], pixel[2]);
+    });
+
+    rangeR.addEventListener('input', function() { inputR.value = rangeR.value; });
+    rangeG.addEventListener('input', function() { inputG.value = rangeG.value; });
+    rangeB.addEventListener('input', function() { inputB.value = rangeB.value; });
+    inputR.addEventListener('input', function() { rangeR.value = inputR.value; });
+    inputG.addEventListener('input', function() { rangeG.value = inputG.value; });
+    inputB.addEventListener('input', function() { rangeB.value = inputB.value; });
+
+    rangeBrightness.addEventListener('input', function() {
+      brightnessValue.textContent = rangeBrightness.value;
+      updatePreview();
+    });
+
+    document.getElementById('btnApply').addEventListener('click', function() {
+      setBase(parseInt(inputR.value), parseInt(inputG.value), parseInt(inputB.value));
+    });
+
+    drawPalette();
+    updatePreview();
+  </script>
+</body>
+</html>
